@@ -1,0 +1,8 @@
+{
+  "name": "NutriLife AI",
+  "description": "AI-powered nutrition companion that helps people understand culturally diverse foods and make mindful, practical choices.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
