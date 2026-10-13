@@ -334,6 +334,105 @@ CORE PRINCIPLES TO FOLLOW:
   }
 });
 
+// Endpoint for "Adaptasi Resep Lebih Sehat" (Healthier Recipe Adaptation)
+app.post('/api/adapt-recipe', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { foodName, culturalOrigin, visibleIngredients, inferredIngredients, language = 'id' } = req.body;
+    const isIndonesian = language === 'id';
+
+    if (!foodName) {
+      res.status(400).json({ success: false, error: 'foodName is required' });
+      return;
+    }
+
+    if (!ai) {
+      const defaultSteps = isIndonesian
+        ? [
+            `**Langkah 1 (Pengurangan Minyak & Bumbu Aromatik Alami):** Kurangi separuh penggunaan minyak goreng atau gunakan teknik tumis cepat dengan wajan anti-lengket. Maksimalkan bumbu aromatik alami seperti bawang merah, bawang putih, dan rempah daun untuk mempertahankan kekayaan rasa autentik ${foodName}.`,
+            `**Langkah 2 (Keseimbangan Porsi & Tambahan Serat Lokal):** Kurangi sepertiga porsi karbohidrat olahan dan gantikan dengan sayuran lokal segar atau lalapan (seperti sawi hijau, mentimun, atau tauge), serta tambahkan protein rendah lemak untuk meningkatkan rasa kenyang lebih lama.`
+          ]
+        : [
+            `**Step 1 (Moderate Cooking Oil & Enhance Fresh Aromatics):** Halve the cooking oil and sauté aromatics using a non-stick pan. Lean into natural garlic, shallots, and fresh herbs to preserve the bold traditional flavor of ${foodName}.`,
+            `**Step 2 (Portion Balance & Local Fiber Addition):** Enjoy two-thirds of the refined grain portion and balance the plate with generous local greens or fresh crunchy produce, pairing with lean protein for lasting fullness.`
+          ];
+
+      res.json({
+        success: true,
+        steps: defaultSteps,
+        source: 'culinary-guidelines'
+      });
+      return;
+    }
+
+    const prompt = `You are NutriLife AI's expert culinary nutritionist and cultural heritage chef.
+Task: Create a 2-step healthier recipe adaptation for the dish: "${foodName}" (${culturalOrigin || 'Traditional Heritage'}).
+Known ingredients / characteristics: ${[...(visibleIngredients || []), ...(inferredIngredients || [])].join(', ') || 'Traditional recipe'}.
+
+STRICT REQUIREMENTS:
+1. FOCUS: Improve nutritional profile (e.g. reduce excess cooking oils/fat, moderate excess sodium, or increase fiber/lean protein) WHILE STRICTLY PRESERVING authentic local taste, culinary identity, aromatic richness, and heritage preparation methods.
+2. STRUCTURE: Exactly 2 steps.
+3. FORMAT: Use clean bullet points for each step:
+   - **${isIndonesian ? 'Langkah 1' : 'Step 1'} ([Short Descriptive Title]):** [Concise practical cooking recommendation]
+   - **${isIndonesian ? 'Langkah 2' : 'Step 2'} ([Short Descriptive Title]):** [Concise practical cooking recommendation]
+4. CONCISENESS: Maximum 150 words total! Keep it under 150 words.
+5. LANGUAGE: Write in ${isIndonesian ? 'natural, culturally encouraging Bahasa Indonesia' : 'clear, encouraging English'}.
+6. TONE: Warm, educational, culturally respectful, non-punitive, and celebratory of local flavors. Do not include introductory text, meta-commentary, or outro greetings. Just the 2 bullet points.`;
+
+    let response: any = null;
+    const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+
+    for (const modelName of candidateModels) {
+      try {
+        response = await ai.models.generateContent({
+          model: modelName,
+          contents: prompt,
+        });
+        if (response?.text) break;
+      } catch (err: any) {
+        console.warn(`Model ${modelName} recipe adaptation attempt failed:`, err?.message || err);
+      }
+    }
+
+    const text = response?.text?.trim();
+    if (!text) {
+      throw new Error('Gemini failed to generate recipe adaptation');
+    }
+
+    const rawLines = text.split('\n').filter((l: string) => l.trim().length > 0);
+    const steps = rawLines
+      .filter((l: string) => l.trim().startsWith('-') || l.trim().startsWith('*') || /^\d+\./.test(l.trim()))
+      .map((l: string) => l.replace(/^[-*]\s*/, '').replace(/^\d+\.\s*/, '').trim());
+
+    const finalSteps = steps.length >= 2 ? steps.slice(0, 2) : [text];
+
+    res.json({
+      success: true,
+      steps: finalSteps,
+      rawText: text,
+      source: 'gemini-culinary-adaptation'
+    });
+  } catch (error: any) {
+    console.error('Error during recipe adaptation:', error);
+    const isIndonesian = req.body?.language === 'id';
+    const foodName = req.body?.foodName || 'makanan ini';
+    const fallbackSteps = isIndonesian
+      ? [
+          `**Langkah 1 (Teknik Memasak Rendah Minyak):** Kurangi penggunaan minyak goreng saat menumis bumbu dasar, gunakan wajan anti-lengket agar aroma rempah alami tetap matang sempurna tanpa merusak cita rasa khas ${foodName}.`,
+          `**Langkah 2 (Pengayaan Sayuran Lokal & Protein Seimbang):** Padukan hidangan dengan sayuran hijau musiman atau lalapan segar lokal, serta atur porsi karbohidrat agar profil nutrisi lebih seimbang.`
+        ]
+      : [
+          `**Step 1 (Lower-Oil Sautéing Technique):** Halve the cooking oil when blooming the aromatic base so the spices release their signature fragrance without excess oil in ${foodName}.`,
+          `**Step 2 (Local Veggie & Balanced Protein Boost):** Complement the plate with crisp local greens or fresh seasonal produce to add fiber and balance the carbohydrate portion.`
+        ];
+
+    res.json({
+      success: true,
+      steps: fallbackSteps,
+      source: 'fallback'
+    });
+  }
+});
+
 // Health check endpoint for Cloud Run container probes
 app.get('/api/health', (_req: Request, res: Response) => {
   res.status(200).json({ status: 'ok', service: 'NutriLife AI', port: PORT });

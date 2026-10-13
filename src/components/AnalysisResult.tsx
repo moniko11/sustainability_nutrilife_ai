@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertTriangle,
   CheckCircle,
@@ -41,7 +41,78 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({
 }) => {
   const [userFoodHint, setUserFoodHint] = useState('');
   const [isBasisExpanded, setIsBasisExpanded] = useState(false);
+  const [activeAction, setActiveAction] = useState<'nutrition' | 'recipe'>('nutrition');
+  const [recipeSteps, setRecipeSteps] = useState<string[] | null>(null);
+  const [isLoadingRecipe, setIsLoadingRecipe] = useState(false);
   const t = translations[language].result;
+
+  // Reset recipe steps when analyzed dish changes
+  useEffect(() => {
+    setRecipeSteps(null);
+    setActiveAction('nutrition');
+  }, [data.foodName]);
+
+  const fetchRecipeAdaptation = async () => {
+    setIsLoadingRecipe(true);
+    try {
+      const res = await fetch('/api/adapt-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          foodName: data.foodName,
+          culturalOrigin: data.culturalOrigin,
+          visibleIngredients: data.visibleIngredients,
+          inferredIngredients: data.inferredIngredients,
+          language
+        })
+      });
+      const json = await res.json();
+      if (json.success && json.steps?.length > 0) {
+        setRecipeSteps(json.steps);
+      } else {
+        throw new Error(json.error || 'Failed to generate recipe adaptation');
+      }
+    } catch (err) {
+      console.error('Error fetching recipe adaptation:', err);
+      const isId = language === 'id';
+      setRecipeSteps([
+        isId
+          ? `**Langkah 1 (Teknik Menumis Minim Minyak & Bumbu Alami):** Kurangi separuh penggunaan minyak goreng dan tumis bumbu dasar rempah alami pada wajan anti-lengket dengan api sedang agar aroma harum khas ${data.foodName} tetap kaya tanpa terasa berminyak.`
+          : `**Step 1 (Lower-Oil Sautéing & Traditional Aromatics):** Halve the cooking oil and gently bloom the traditional spices in a non-stick pan to retain the authentic flavor profile of ${data.foodName} with lower saturated fat.`,
+        isId
+          ? `**Langkah 2 (Pengayaan Sayuran Lokal & Penyeimbang Porsi):** Nikmati dua pertiga porsi karbohidrat olahan dan padukan dengan lalapan atau sayuran hijau lokal (seperti sawi hijau, mentimun, atau tauge) serta protein tanpa lemak untuk serat dan rasa kenyang tahan lama.`
+          : `**Step 2 (Local Veggie Addition & Portion Balance):** Savor two-thirds of the refined grain portion and balance the dish with crunchy local greens or fresh seasonal produce, pairing with lean protein for lasting fullness.`
+      ]);
+    } finally {
+      setIsLoadingRecipe(false);
+    }
+  };
+
+  const handleSelectRecipeAdaptation = () => {
+    setActiveAction('recipe');
+    if (!recipeSteps && !isLoadingRecipe) {
+      fetchRecipeAdaptation();
+    }
+  };
+
+  const renderFormattedStep = (text: string) => {
+    const cleanText = text.replace(/^[-*•]\s*/, '');
+    const parts = cleanText.split(/(\*\*.*?\*\*)/g);
+    return (
+      <span>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return (
+              <strong key={i} className="font-bold text-slate-900 mr-1">
+                {part.slice(2, -2)}
+              </strong>
+            );
+          }
+          return <span key={i}>{part}</span>;
+        })}
+      </span>
+    );
+  };
 
   // Handle unidentifiable dish state with respect and clarity
   if (!data.isIdentifiable) {
@@ -128,10 +199,51 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 1. Identified Dish & Result Header Hero Card */}
-      <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/90 shadow-sm relative overflow-hidden">
-        {/* Subtle accent background glow */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -z-10 pointer-events-none" />
+      {/* Dual Actions Bar: 1. 📊 Analisis Nutrisi & 2. 👨‍🍳 Adaptasi Resep Lebih Sehat */}
+      <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+        <div className="flex items-center gap-1.5 p-1 bg-slate-100 rounded-xl flex-1 max-w-xl">
+          <button
+            type="button"
+            onClick={() => setActiveAction('nutrition')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              activeAction === 'nutrition'
+                ? 'bg-white text-emerald-800 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>{t.nutritionAnalysisAction}</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSelectRecipeAdaptation}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-bold transition-all ${
+              activeAction === 'recipe'
+                ? 'bg-white text-emerald-800 shadow-2xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <span>{t.recipeAdaptationAction}</span>
+          </button>
+        </div>
+
+        <div className="flex items-center justify-end px-1">
+          <button
+            onClick={onReset}
+            type="button"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-emerald-700 bg-slate-50 hover:bg-slate-100 px-3.5 py-2 rounded-xl border border-slate-200 transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>{t.newPhotoButton}</span>
+          </button>
+        </div>
+      </div>
+
+      {activeAction === 'nutrition' && (
+        <>
+          {/* 1. Identified Dish & Result Header Hero Card */}
+          <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/90 shadow-sm relative overflow-hidden">
+            {/* Subtle accent background glow */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -z-10 pointer-events-none" />
 
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
           <div>
@@ -657,6 +769,159 @@ export const AnalysisResult: React.FC<AnalysisResultProps> = ({
           </span>
         </div>
       </div>
+    </>
+  )}
+
+  {/* 2. 👨‍🍳 Adaptasi Resep Lebih Sehat View */}
+  {activeAction === 'recipe' && (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {/* Header Card */}
+      <div className="bg-white rounded-3xl p-5 sm:p-7 border border-emerald-200/90 shadow-sm relative overflow-hidden">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-50 rounded-full blur-3xl -z-10 pointer-events-none" />
+
+        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100/80 text-emerald-800 border border-emerald-200">
+                <ChefHat className="w-3.5 h-3.5 text-emerald-600" />
+                <span>{t.recipeAdaptationAction}</span>
+              </span>
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
+                {data.foodName}
+              </span>
+              <span className="px-2.5 py-1 rounded-full text-xs font-semibold bg-teal-100 text-teal-800 border border-teal-200">
+                {data.culturalOrigin}
+              </span>
+            </div>
+
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
+              {t.recipeAdaptationTitle}
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-600 mt-1 leading-relaxed">
+              {t.recipeAdaptationSubtitle}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 self-start">
+            <button
+              type="button"
+              onClick={fetchRecipeAdaptation}
+              disabled={isLoadingRecipe}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100/80 px-3 py-2 rounded-xl border border-emerald-200 transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingRecipe ? 'animate-spin' : ''}`} />
+              <span>{t.regenerateRecipe}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Cultural Preservation Affirmation Banner */}
+        <div className="mt-4 p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/70 flex items-start gap-2.5">
+          <Sparkles className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
+          <div className="text-xs text-emerald-900 leading-relaxed font-medium">
+            <span className="font-bold">{t.recipeHeritageNotice}. </span>
+            {language === 'id'
+              ? 'Kami tidak pernah meminta Anda meninggalkan kelezatan masakan warisan; perubahan praktis ini menjaga rasa otentik sambil menyeimbangkan profil nutrisi.'
+              : 'We never ask you to sacrifice heritage flavors; these practical tweaks preserve authentic taste while balancing nutritional quality.'}
+          </div>
+        </div>
+      </div>
+
+      {/* 2-Step Adaptation Content */}
+      <div className="bg-white rounded-3xl p-5 sm:p-7 border border-slate-200/90 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+          <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+            <span>👨‍🍳</span>
+            <span>{language === 'id' ? 'Panduan Adaptasi 2 Langkah' : '2-Step Adaptation Guide'}</span>
+          </h3>
+          <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+            {t.recipeWordCountNote}
+          </span>
+        </div>
+
+        {isLoadingRecipe ? (
+          <div className="py-12 flex flex-col items-center justify-center text-center space-y-3">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center animate-pulse">
+              <ChefHat className="w-6 h-6 animate-bounce" />
+            </div>
+            <div className="text-sm font-bold text-slate-800">
+              {t.generatingRecipe}
+            </div>
+            <p className="text-xs text-slate-500 max-w-sm">
+              {language === 'id'
+                ? `Menghitung penyesuaian bahan dan teknik memasak untuk ${data.foodName}...`
+                : `Formulating ingredient and culinary technique adaptations for ${data.foodName}...`}
+            </p>
+          </div>
+        ) : (
+          <ul className="space-y-3.5 list-none p-0 m-0">
+            {recipeSteps && recipeSteps.length > 0 ? (
+              recipeSteps.map((step, idx) => (
+                <li
+                  key={idx}
+                  className="bg-emerald-50/40 hover:bg-emerald-50/70 rounded-2xl p-4 sm:p-5 border border-emerald-200/70 transition-colors flex items-start gap-3.5"
+                >
+                  <div className="w-7 h-7 rounded-xl bg-emerald-200/80 text-emerald-800 text-xs font-extrabold flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1 text-xs sm:text-sm text-slate-800 leading-relaxed font-normal">
+                    <span className="font-bold text-emerald-700 mr-2 text-base leading-none">•</span>
+                    {renderFormattedStep(step)}
+                  </div>
+                </li>
+              ))
+            ) : (
+              <li className="text-xs text-slate-500 italic p-3">
+                {language === 'id'
+                  ? 'Adaptasi resep sedang dipersiapkan...'
+                  : 'Recipe adaptation is being prepared...'}
+              </li>
+            )}
+          </ul>
+        )}
+      </div>
+
+      {/* Cultural Nutrition Principle Pledge Card */}
+      <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 rounded-3xl p-5 sm:p-6 text-white shadow-md shadow-emerald-700/20">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center text-white shrink-0">
+            <HeartHandshake className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-[10px] uppercase tracking-wider font-extrabold bg-white/25 px-2 py-0.5 rounded-full text-white">
+              {t.culturalPrincipleBadge}
+            </span>
+            <h4 className="text-base sm:text-lg font-bold mt-1 mb-1">
+              {t.culturalPrincipleTitle}
+            </h4>
+            <p className="text-xs sm:text-sm text-emerald-50 leading-relaxed font-normal">
+              {data.culturalPrincipleNote}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Action to switch back or analyze new photo */}
+      <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <button
+          onClick={() => setActiveAction('nutrition')}
+          type="button"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs sm:text-sm border border-slate-200 shadow-2xs transition-all"
+        >
+          <span>{t.nutritionAnalysisAction}</span>
+        </button>
+
+        <button
+          onClick={onReset}
+          type="button"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs sm:text-sm shadow-md shadow-emerald-600/20 transition-all"
+        >
+          <RefreshCw className="w-4 h-4" />
+          <span>{t.analyzeAnotherButton}</span>
+        </button>
+      </div>
+    </div>
+  )}
     </div>
   );
 };

@@ -118,6 +118,14 @@ export interface Translations {
     basisUncertainDesc: string;
     toggleShow: string;
     toggleHide: string;
+    nutritionAnalysisAction: string;
+    recipeAdaptationAction: string;
+    recipeAdaptationTitle: string;
+    recipeAdaptationSubtitle: string;
+    recipeHeritageNotice: string;
+    generatingRecipe: string;
+    regenerateRecipe: string;
+    recipeWordCountNote: string;
   };
   modal: {
     badge: string;
@@ -286,6 +294,14 @@ export const translations: Record<Language, Translations> = {
       basisUncertainDesc: 'What the photo cannot confirm',
       toggleShow: 'Show details',
       toggleHide: 'Hide details',
+      nutritionAnalysisAction: '📊 Nutrition Analysis',
+      recipeAdaptationAction: '👨‍🍳 Healthier Recipe Adaptation',
+      recipeAdaptationTitle: 'Healthier Recipe Adaptation (2 Steps)',
+      recipeAdaptationSubtitle: 'Elevating nutrition while celebrating authentic taste, identity, and cultural heritage',
+      recipeHeritageNotice: 'Preserves traditional spices, culinary soul, and cultural identity',
+      generatingRecipe: 'Crafting culinary adaptation...',
+      regenerateRecipe: 'Refresh Adaptation',
+      recipeWordCountNote: 'Concise 2-step guide (< 150 words)',
     },
     modal: {
       badge: 'NutriLife AI Constitution',
@@ -460,6 +476,14 @@ export const translations: Record<Language, Translations> = {
       basisUncertainDesc: 'Apa yang tidak dapat dipastikan dari foto',
       toggleShow: 'Tampilkan rincian',
       toggleHide: 'Sembunyikan rincian',
+      nutritionAnalysisAction: '📊 Analisis Nutrisi',
+      recipeAdaptationAction: '👨‍🍳 Adaptasi Resep Lebih Sehat',
+      recipeAdaptationTitle: 'Adaptasi Resep Lebih Sehat (2 Langkah)',
+      recipeAdaptationSubtitle: 'Meningkatkan profil nutrisi sambil mempertahankan cita rasa lokal, identitas, dan warisan budaya',
+      recipeHeritageNotice: 'Mempertahankan bumbu rempah tradisional, jiwa kuliner, dan identitas budaya',
+      generatingRecipe: 'Meracik adaptasi kuliner...',
+      regenerateRecipe: 'Perbarui Adaptasi',
+      recipeWordCountNote: 'Panduan 2 langkah ringkas (< 150 kata)',
     },
     modal: {
       badge: 'Konstitusi NutriLife AI',
