@@ -5,7 +5,7 @@ import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
 
-dotenv.config();
+dotenv.config({ override: true });
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -15,13 +15,14 @@ const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '25mb' }));
 
-// Setup server-side Gemini client
-const apiKey = process.env.GEMINI_API_KEY;
-let ai: GoogleGenAI | null = null;
-
-if (apiKey && apiKey !== 'MY_GEMINI_API_KEY') {
-  ai = new GoogleGenAI({
-    apiKey,
+// Helper to obtain server-side Gemini client with valid API key
+function getGeminiClient(): GoogleGenAI | null {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key || key.trim() === '' || key === 'MY_GEMINI_API_KEY') {
+    return null;
+  }
+  return new GoogleGenAI({
+    apiKey: key.trim(),
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -40,6 +41,7 @@ app.post('/api/analyze-food', async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const ai = getGeminiClient();
     if (!ai) {
       res.status(503).json({
         error: 'Gemini API is not configured on the server. Please ensure GEMINI_API_KEY is configured in the environment.'
@@ -345,6 +347,7 @@ app.post('/api/adapt-recipe', async (req: Request, res: Response): Promise<void>
       return;
     }
 
+    const ai = getGeminiClient();
     if (!ai) {
       const defaultSteps = isIndonesian
         ? [
@@ -435,7 +438,12 @@ STRICT REQUIREMENTS:
 
 // Health check endpoint for Cloud Run container probes
 app.get('/api/health', (_req: Request, res: Response) => {
-  res.status(200).json({ status: 'ok', service: 'NutriLife AI', port: PORT });
+  res.status(200).json({
+    status: 'ok',
+    service: 'NutriLife AI',
+    port: PORT,
+    geminiConfigured: !!getGeminiClient()
+  });
 });
 
 // Setup Vite middleware in dev or static files in production

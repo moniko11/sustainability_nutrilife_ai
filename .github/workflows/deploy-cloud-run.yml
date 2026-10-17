@@ -1,0 +1,45 @@
+name: Build and Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  SERVICE_NAME: nutrilife-ai
+  REGION: asia-southeast1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Note: To enable deployment from GitHub Actions:
+      # 1. Set up Workload Identity Federation or GCP Service Account Key in GitHub Secrets: GCP_SA_KEY
+      # 2. Add GEMINI_API_KEY to GitHub Secrets: Settings -> Secrets and variables -> Actions
+      - name: Authenticate to Google Cloud
+        if: env.GCP_SA_KEY != ''
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        if: env.GCP_SA_KEY != ''
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Deploy to Cloud Run
+        if: env.GCP_SA_KEY != ''
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --source . \
+            --region ${{ env.REGION }} \
+            --allow-unauthenticated \
+            --set-env-vars GEMINI_API_KEY="${{ secrets.GEMINI_API_KEY }}"
